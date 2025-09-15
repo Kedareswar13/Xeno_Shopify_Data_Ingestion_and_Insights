@@ -144,6 +144,10 @@ export function useAuth(): UseAuthReturn {
     localStorage.removeItem('userId');
     localStorage.removeItem('user');
     queryClient.clear();
+    // Notify other parts of the app in the same tab
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:update'));
+    }
   }, [queryClient]);
 
   // Function to fetch user data
@@ -268,6 +272,9 @@ export function useAuth(): UseAuthReturn {
       localStorage.setItem('token', token);
       localStorage.setItem('userId', completeUser.id);
       setUser(completeUser);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:update'));
+      }
       
       // Check if email is verified
       if (!completeUser.isVerified) {
@@ -362,40 +369,28 @@ export function useAuth(): UseAuthReturn {
     },
     onSuccess: async (response) => {
       console.log('OTP verification response:', response);
-      
-      // Handle the token and user data from the response
+
       const token = response.token;
       const userData = response.user;
 
       if (token && userData) {
-        // Store the token and user data
+        // Persist auth
         localStorage.setItem('token', token);
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('userId', userData.id);
         localStorage.removeItem('pendingVerificationEmail');
-        
-        // Invalidate any cached queries that depend on auth state
-        await queryClient.invalidateQueries({ queryKey: ['auth'] });
-        
-        // Show success message and redirect
-        toast.success('Email verified successfully! Redirecting...');
-        
-        // Force a hard refresh to ensure all auth state is properly set
-        window.location.href = '/dashboard';
-        return;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('auth:update'));
+        }
+        // Let caller navigate to dashboard to avoid race with provider hydration
+        toast.success('Email verified successfully!');
       }
-      
-      // If we get here, something went wrong with the response
-      toast.success('Email verified successfully! Please log in.');
-      router.push('/login');
     },
     onError: (error: any) => {
       console.error('OTP verification error:', error);
       const errorMessage = error?.response?.data?.message || 'Failed to verify OTP. Please try again.';
       toast.error(errorMessage);
-      
-      // Clear any invalid auth state
       if (error?.response?.status === 401) {
         clearUser();
       }
