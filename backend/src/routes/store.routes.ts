@@ -6,12 +6,7 @@ import { catchAsync } from '../middleware/error.middleware';
 
 const router = Router();
 
-// In development, allow unauthenticated GET /api/stores so the UI can render without login
-if (process.env.NODE_ENV === 'development') {
-  router.get('/', catchAsync(storeController.getStores));
-}
-
-// Apply protect middleware to remaining routes
+// All routes require authentication
 router.use(protect);
 
 // Routes
@@ -22,18 +17,19 @@ router
   .post(
     [
       body('name')
+        .optional()
         .trim()
-        .notEmpty()
-        .withMessage('Store name is required')
         .isLength({ min: 2, max: 100 })
         .withMessage('Store name must be between 2 and 100 characters'),
-      body('shopifyShopId')
-        .optional()
+      body('domain')
         .trim()
-        .isLength({ min: 3, max: 100 })
-        .withMessage('Shopify shop ID must be between 3 and 100 characters'),
+        .notEmpty()
+        .withMessage('Domain is required')
+        .matches(/^[a-z0-9-]+\.myshopify\.com$/i)
+        .withMessage('Domain must be a valid myshopify.com domain'),
       body('accessToken')
-        .optional()
+        .notEmpty()
+        .withMessage('Access token is required')
         .isLength({ min: 10 })
         .withMessage('Access token must be at least 10 characters long'),
     ],

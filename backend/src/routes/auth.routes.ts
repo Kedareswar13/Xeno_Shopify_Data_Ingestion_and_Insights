@@ -91,13 +91,9 @@ const updatePasswordValidation = [
 router.post('/signup', signupValidation, catchAsync(authController.signup));
 router.post('/login', loginValidation, catchAsync(authController.login));
 router.post('/verify-otp', otpLimiter, verifyOtpValidation, catchAsync(authController.verifyOTP));
-
-// Protected routes
-router.use(protect);
-router.get('/me', catchAsync(authController.getCurrentUser));
-router.get('/logout', catchAsync(authController.logout));
+// Forgot/reset password should be public (no token yet)
 router.post(
-  '/request-reset',
+  '/forgot-password',
   otpLimiter,
   forgotPasswordValidation,
   catchAsync(authController.forgotPassword)
@@ -107,6 +103,11 @@ router.post(
   resetPasswordValidation,
   catchAsync(authController.resetPassword)
 );
+
+// Protected routes
+router.use(protect);
+router.get('/me', catchAsync(authController.getCurrentUser));
+router.get('/logout', catchAsync(authController.logout));
 router.patch(
   '/update-password',
   updatePasswordValidation,
