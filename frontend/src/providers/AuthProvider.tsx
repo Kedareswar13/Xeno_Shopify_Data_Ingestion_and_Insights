@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { api } from '@/lib/api';
 
 interface User {
   id: string;
@@ -22,7 +23,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // List of public paths that don't require authentication
-const publicPaths = ['/login', '/signup', '/verify-otp', '/forgot-password', '/reset-password'];
+const publicPaths = ['/login', '/signup', '/verify-otp', '/forgot-password', '/reset-otp', '/reset-password'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -31,32 +32,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Check if user is logged in
+    // Check if user is logged in using real backend
     const checkAuth = async () => {
       try {
-        // Here you would typically check for an auth token in cookies/localStorage
-        // and validate it with your backend
         const token = localStorage.getItem('token');
-        
-        if (token) {
-          // Validate token with backend
-          // const response = await fetch('/api/auth/me', {
-          //   headers: { 'Authorization': `Bearer ${token}` }
-          // });
-          // if (response.ok) {
-          //   const userData = await response.json();
-          //   setUser(userData);
-          // } else {
-          //   localStorage.removeItem('token');
-          //   setUser(null);
-          // }
-          
-          // For now, just set a mock user
-          setUser({ id: '1', email: 'user@example.com', name: 'John Doe' });
+        const cachedUser = localStorage.getItem('user');
+        if (!token) {
+          setUser(null);
+          return;
+        }
+        if (cachedUser) {
+          try { setUser(JSON.parse(cachedUser)); } catch {}
+        }
+        const me: any = await api.get('/api/auth/me');
+        const u = me?.data?.user || me?.user || me;
+        if (u?.id) {
+          setUser(u);
+          localStorage.setItem('user', JSON.stringify(u));
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
         }
       } catch (error) {
         console.error('Auth check failed:', error);
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
       } finally {
         setLoading(false);
@@ -64,6 +65,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     checkAuth();
+  }, []);
+
+  // Listen for token changes from other parts of the app (e.g., hooks/useAuth)
+  useEffect(() => {
+    const handleAuthUpdate = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setUser(null);
+          return;
+        }
+        const me: any = await api.get('/api/auth/me');
+        const u = me?.data?.user || me?.user || me;
+        if (u?.id) {
+          setUser(u);
+          localStorage.setItem('user', JSON.stringify(u));
+        }
+      } catch (e) {
+        // If it fails, clear user
+        setUser(null);
+      }
+    };
+
+    window.addEventListener('storage', handleAuthUpdate);
+    window.addEventListener('auth:update', handleAuthUpdate as EventListener);
+    return () => {
+      window.removeEventListener('storage', handleAuthUpdate);
+      window.removeEventListener('auth:update', handleAuthUpdate as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -80,43 +110,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      // Here you would typically make an API call to your backend
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password })
-      // });
-      // const data = await response.json();
-      
-      // if (!response.ok) throw new Error(data.message || 'Login failed');
-      
-      // localStorage.setItem('token', data.token);
-      // setUser(data.user);
-      
-      // For now, just set a mock user
-      setUser({ id: '1', email, name: 'John Doe' });
-      localStorage.setItem('token', 'mock-token');
-      
+      const resp: any = await api.post('/api/auth/login', { email, password });
+      const token = resp?.token || resp?.data?.token;
+      const u = resp?.data?.user || resp?.user;
+      if (!token || !u?.id) throw new Error('Invalid login response');
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(u));
+      localStorage.setItem('userId', u.id);
+      setUser(u);
       router.push('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
+      // Clear any bad state
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       throw error;
     }
   };
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      // Here you would typically make an API call to your backend
-      // const response = await fetch('/api/auth/register', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ name, email, password })
-      // });
-      // const data = await response.json();
-      
-      // if (!response.ok) throw new Error(data.message || 'Registration failed');
-      
-      // For now, just redirect to verify-otp
+      await api.post('/api/auth/signup', { username: name, email, password, passwordConfirm: password });
       router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (error) {
       console.error('Registration failed:', error);
@@ -126,19 +140,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyOtp = async (email: string, otp: string): Promise<boolean> => {
     try {
-      // Here you would typically make an API call to your backend
-      // const response = await fetch('/api/auth/verify-otp', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, otp })
-      // });
-      // const data = await response.json();
-      
-      // if (!response.ok) throw new Error(data.message || 'Verification failed');
-      
-      // For now, just log in the user
-      await login(email, 'password');
-      return true;
+      const resp: any = await api.post('/api/auth/verify-otp', { email, otp });
+      const token = resp?.token || resp?.data?.token;
+      const u = resp?.user || resp?.data?.user;
+      if (token && u?.id) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(u));
+        localStorage.setItem('userId', u.id);
+        setUser(u);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('OTP verification failed:', error);
       return false;
@@ -147,22 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // Clear all auth-related data from localStorage
+      await api.get('/api/auth/logout');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('userId');
       localStorage.removeItem('pendingVerificationEmail');
-      
-      // Clear any auth cookies if they exist
-      document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      
-      // Reset user state
       setUser(null);
-      
-      // Redirect to login page with a small delay to ensure state is cleared
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
+      setTimeout(() => { window.location.href = '/login'; }, 100);
     } catch (error) {
       console.error('Error during logout:', error);
       // Still redirect to login even if there's an error
