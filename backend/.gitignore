@@ -1,15 +1,15 @@
-# local env files
-.env
-.env.example
-.env.test
+# # local env files
+# .env
+# .env.example
+# .env.test
 
-#node modules
-/node_modules
+# #node modules
+# /node_modules
 
-#logs
-/logs
+# #logs
+# /logs
 
-#JSON files
-nodemon.json
-package-lock.json
-tsconfig.json
+# #JSON files
+# nodemon.json
+# package-lock.json
+# tsconfig.json
