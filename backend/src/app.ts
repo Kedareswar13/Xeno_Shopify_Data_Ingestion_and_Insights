@@ -49,15 +49,44 @@ class App {
     // Security headers
     this.app.use(helmet());
 
-    // Enable CORS
+    // Enable CORS (flexible for dev)
+    const configuredOrigins = (process.env.FRONTEND_URL || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const devOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
+    ];
+    const allowList = configuredOrigins.length > 0 ? configuredOrigins : devOrigins;
+
     this.app.use(
       cors({
-        origin: process.env.FRONTEND_URL?.split(',') || 'http://localhost:3000',
+        origin: (origin, callback) => {
+          // Allow non-browser or same-origin requests (like Postman) where origin may be undefined
+          if (!origin) return callback(null, true);
+          if (allowList.includes(origin)) return callback(null, true);
+          // In dev, be permissive for any localhost:* origin
+          if ((process.env.NODE_ENV || 'development') === 'development' && /^(http:\/\/)?(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+            return callback(null, true);
+          }
+          return callback(new Error(`CORS blocked for origin: ${origin}`));
+        },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
       })
     );
+
+    // Handle CORS preflight early to avoid auth middleware blocking OPTIONS
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      if (req.method === 'OPTIONS') {
+        return res.sendStatus(StatusCodes.NO_CONTENT);
+      }
+      next();
+    });
 
     // Parse JSON bodies
     this.app.use(express.json({ limit: '10kb' }));
