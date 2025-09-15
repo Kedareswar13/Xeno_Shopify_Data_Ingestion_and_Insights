@@ -20,9 +20,9 @@ export const connectStore = async (req: Request, res: Response, next: NextFuncti
     const user = req.user as AuthUser;
     const tenantId = user.tenantId as string;
 
-    if (!domain || !accessToken || !name) {
+    if (!domain || !accessToken) {
       return next(
-        new AppError('Domain, access token, and name are required', StatusCodes.BAD_REQUEST)
+        new AppError('Domain and access token are required', StatusCodes.BAD_REQUEST)
       );
     }
 
@@ -31,7 +31,7 @@ export const connectStore = async (req: Request, res: Response, next: NextFuncti
       tenantId,
       domain,
       accessToken,
-      name,
+      name: name || domain.replace(/\.myshopify\.com$/i, ''),
       // Extract scope from the token if available
       scope: [],
     });
@@ -75,24 +75,16 @@ export const getStores = async (req: Request, res: Response, next: NextFunction)
   }
   try {
     const user = req.user as AuthUser;
-    let { tenantId } = user || ({} as any);
-
-    // Development fallback: if not authenticated, use a dev tenant scope
-    if ((!tenantId || typeof tenantId !== 'string') && process.env.NODE_ENV === 'development') {
-      const devTenantName = 'Dev Tenant';
-      const devTenant = await prisma.tenant.upsert({
-        where: { name: devTenantName },
-        update: {},
-        create: { name: devTenantName },
-      });
-      tenantId = devTenant.id;
+    const { tenantId } = user || ({} as any);
+    if (!tenantId || typeof tenantId !== 'string') {
+      return next(new AppError('Unauthorized', StatusCodes.UNAUTHORIZED));
     }
     const { page = 1, limit = 10, search } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
     
     // Build where clause
-    const where: any = tenantId ? { tenantId } : {};
+    const where: any = { tenantId };
     if (search) {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
@@ -120,51 +112,7 @@ export const getStores = async (req: Request, res: Response, next: NextFunction)
       prisma.store.count({ where }),
     ]);
 
-    // Auto-provision a default store once per tenant if none exist and env is configured
-    if (total === 0 && !search) {
-      const domain = process.env.SHOPIFY_SHOP_DOMAIN;
-      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-      if (domain && accessToken && tenantId) {
-        try {
-          const provisioned = await prisma.store.upsert({
-            where: { domain },
-            update: { tenantId: tenantId as string, isActive: true },
-            create: {
-              tenantId: tenantId as string,
-              name: domain.replace(/\.myshopify\.com$/i, ''),
-              domain,
-              accessToken,
-              scope: [],
-              isActive: true,
-            },
-          });
-
-          // Re-query after provisioning
-          [stores, total] = await Promise.all([
-            prisma.store.findMany({
-              where,
-              select: {
-                id: true,
-                name: true,
-                domain: true,
-                shopifyId: true,
-                isActive: true,
-                lastSyncedAt: true,
-                createdAt: true,
-                updatedAt: true,
-              },
-              skip,
-              take: Number(limit),
-              orderBy: { createdAt: 'desc' },
-            }),
-            prisma.store.count({ where }),
-          ]);
-          logger.info(`Auto-provisioned default store for tenant ${tenantId}: ${provisioned.domain}`);
-        } catch (e) {
-          logger.warn('Auto-provision default store failed or already exists for another tenant', e);
-        }
-      }
-    }
+    // No auto-provisioning; tenant must connect a store explicitly
 
     res.status(StatusCodes.OK).json({
       status: 'success',

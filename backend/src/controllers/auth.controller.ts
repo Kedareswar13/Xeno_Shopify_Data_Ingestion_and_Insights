@@ -452,8 +452,9 @@ export const forgotPassword = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     // 1) Get user based on POSTed email
     const { email } = req.body;
+    const normalizedEmail = (email || '').toLowerCase();
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (!user) {

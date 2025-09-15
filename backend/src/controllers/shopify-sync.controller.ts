@@ -20,14 +20,12 @@ export class ShopifySyncController {
       return next(new AppError('Store not found', StatusCodes.NOT_FOUND));
     }
 
-    // In dev, allow when no user present
+    // Enforce tenant match (requires authenticated user)
     const tenantId = req.user?.tenantId as string | undefined;
-    if (!tenantId && process.env.NODE_ENV === 'development') {
-      return store;
+    if (!tenantId) {
+      return next(new AppError('Unauthorized', StatusCodes.UNAUTHORIZED));
     }
-
-    // If user present, enforce tenant match
-    if (tenantId && store.tenantId !== tenantId) {
+    if (store.tenantId !== tenantId) {
       return next(new AppError('Forbidden', StatusCodes.FORBIDDEN));
     }
     return store;
