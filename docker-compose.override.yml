@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "4001:4001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/xeno_shopify_insights?schema=public
+      - JWT_SECRET=your_jwt_secret
+      - JWT_EXPIRES_IN=30d
+      - JWT_COOKIE_EXPIRES_IN=30
+      - PORT=4001
+    depends_on:
+      - postgres
+    command: sh -c "npm install && npx prisma migrate dev --name init && npm run dev"

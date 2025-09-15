@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         String   @id @default(cuid())
+  externalId String?  @unique
+  name       String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  stores     Store[]
+  users      User[]
+
+  @@map("tenants")
+}
+
+model Store {
+  id           String     @id @default(cuid())
+  tenantId     String
+  name         String
+  domain       String     @unique
+  shopifyId    String?    @unique
+  accessToken  String?
+  scope        String[]
+  isActive     Boolean    @default(true)
+  lastSyncedAt DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  customers    Customer[]
+  events       Event[]
+  orders       Order[]
+  products     Product[]
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([domain])
+  @@index([shopifyId])
+  @@map("stores")
+}
+
+model User {
+  id                        String    @id @default(cuid())
+  tenantId                  String
+  email                     String    @unique
+  username                  String?
+  passwordHash              String
+  isVerified                Boolean   @default(false)
+  otp                       String?
+  otpExpiresAt              DateTime?
+  resetPasswordOtp          String?
+  resetPasswordOtpExpiresAt DateTime?
+  failedLoginAttempts       Int       @default(0)
+  lastLoginAt               DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  signupOtp                 String?
+  signupOtpExpires          DateTime?
+  tenant                    Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, email])
+  @@map("users")
+}
+
+model Product {
+  id                String    @id @default(cuid())
+  storeId           String
+  tenantId          String
+  shopifyId         String?   @unique
+  sku               String?   @map("sku")
+  title             String
+  description       String?
+  price             Float
+  compareAtPrice    Float?
+  inventoryQuantity Int?
+  vendor            String?
+  productType       String?
+  publishedAt       DateTime?
+  handle            String?
+  tags              String[]
+  images            Json?
+  variants          Json?
+  options           Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  store             Store     @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([shopifyId])
+  @@index([sku])
+  @@map("products")
+}
+
+model Customer {
+  id               String    @id @default(cuid())
+  storeId          String
+  tenantId         String
+  shopifyId        String?   @unique
+  email            String?
+  firstName        String?
+  lastName         String?
+  phone            String?
+  acceptsMarketing Boolean   @default(false)
+  totalSpend       Float     @default(0)
+  ordersCount      Int       @default(0)
+  state            String?
+  verifiedEmail    Boolean   @default(false)
+  addresses        Json?
+  defaultAddress   Json?
+  tags             String[]
+  lastOrderId      String?
+  lastOrderDate    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  store            Store     @relation(fields: [storeId], references: [id])
+  orders           Order[]
+
+  @@unique([storeId, email])
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([email])
+  @@index([shopifyId])
+  @@map("customers")
+}
+
+model Order {
+  id                  String    @id @default(cuid())
+  storeId             String
+  tenantId            String
+  shopifyId           String?   @unique
+  orderNumber         String
+  customerId          String?
+  customerEmail       String?
+  financialStatus     String?
+  fulfillmentStatus   String?
+  currency            String    @default("USD")
+  totalPrice          Float
+  subtotalPrice       Float
+  totalTax            Float
+  totalDiscounts      Float     @default(0)
+  totalLineItemsPrice Float
+  lineItems           Json
+  shippingAddress     Json?
+  billingAddress      Json?
+  shippingLines       Json?
+  discountCodes       Json?
+  note                String?
+  tags                String[]
+  processedAt         DateTime?
+  cancelledAt         DateTime?
+  closedAt            DateTime?
+  refunds             Json?
+  transactions        Json?
+  customerLocale      String?
+  orderStatusUrl      String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  customer            Customer? @relation(fields: [customerId], references: [id])
+  store               Store     @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([shopifyId])
+  @@index([orderNumber])
+  @@index([financialStatus])
+  @@index([fulfillmentStatus])
+  @@map("orders")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  storeId   String
+  tenantId  String
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  store     Store    @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([type])
+  @@map("events")
+}

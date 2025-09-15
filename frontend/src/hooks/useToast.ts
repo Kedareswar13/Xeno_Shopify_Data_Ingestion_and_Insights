@@ -1,0 +1,125 @@
+import React from 'react';
+import { toast as sonnerToast } from 'sonner';
+
+type ToastVariant = 'default' | 'destructive' | 'success' | 'warning' | 'info';
+
+interface ToastOptions {
+  variant?: ToastVariant;
+  description?: string | React.ReactNode;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+  className?: string;
+  duration?: number;
+}
+
+const getIcon = (variant: ToastVariant): React.ReactNode => {
+  const baseClasses = 'inline-flex items-center justify-center w-6 h-6 rounded-full mr-2';
+  
+  switch (variant) {
+    case 'success':
+      return React.createElement('div', { 
+        className: `${baseClasses} bg-green-100 text-green-600`,
+        children: React.createElement('svg', {
+          xmlns: "http://www.w3.org/2000/svg",
+          className: "h-4 w-4",
+          viewBox: "0 0 20 20",
+          fill: "currentColor",
+          children: React.createElement('path', {
+            fillRule: "evenodd",
+            d: "M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z",
+            clipRule: "evenodd"
+          })
+        })
+      });
+    case 'warning':
+      return React.createElement('div', { 
+        className: `${baseClasses} bg-yellow-100 text-yellow-600`,
+        children: React.createElement('svg', {
+          xmlns: "http://www.w3.org/2000/svg",
+          className: "h-4 w-4",
+          viewBox: "0 0 20 20",
+          fill: "currentColor",
+          children: React.createElement('path', {
+            fillRule: "evenodd",
+            d: "M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z",
+            clipRule: "evenodd"
+          })
+        })
+      });
+    case 'info':
+      return React.createElement('div', { 
+        className: `${baseClasses} bg-blue-100 text-blue-600`,
+        children: React.createElement('svg', {
+          xmlns: "http://www.w3.org/2000/svg",
+          className: "h-4 w-4",
+          viewBox: "0 0 20 20",
+          fill: "currentColor",
+          children: React.createElement('path', {
+            fillRule: "evenodd",
+            d: "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z",
+            clipRule: "evenodd"
+          })
+        })
+      });
+    case 'destructive':
+      return React.createElement('div', { 
+        className: `${baseClasses} bg-red-100 text-red-600`,
+        children: React.createElement('svg', {
+          xmlns: "http://www.w3.org/2000/svg",
+          className: "h-4 w-4",
+          viewBox: "0 0 20 20",
+          fill: "currentColor",
+          children: React.createElement('path', {
+            fillRule: "evenodd",
+            d: "M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z",
+            clipRule: "evenodd"
+          })
+        })
+      });
+    default:
+      return null;
+  }
+};
+
+export const useToast = () => {
+  const toast = (title: string, options: ToastOptions = {}) => {
+    const { variant = 'default', description, action, className, duration = 3000 } = options;
+    const icon = getIcon(variant);
+    
+    const toastContent = React.createElement('div', {
+      className: 'flex items-center',
+      children: [
+        icon,
+        React.createElement('span', { key: 'text' }, title)
+      ]
+    });
+
+    return sonnerToast(toastContent, {
+      description,
+      duration,
+      className: `toast-${variant} ${className || ''}`,
+      ...(action && {
+        action: {
+          label: action.label,
+          onClick: action.onClick,
+        },
+      }),
+    });
+  };
+
+  // Add convenience methods for each variant
+  const enhancedToast = Object.assign(toast, {
+    success: (title: string, options: Omit<ToastOptions, 'variant'> = {}) => 
+      toast(title, { ...options, variant: 'success' }),
+    error: (title: string, options: Omit<ToastOptions, 'variant'> = {}) => 
+      toast(title, { ...options, variant: 'destructive' }),
+    warning: (title: string, options: Omit<ToastOptions, 'variant'> = {}) => 
+      toast(title, { ...options, variant: 'warning' }),
+    info: (title: string, options: Omit<ToastOptions, 'variant'> = {}) => 
+      toast(title, { ...options, variant: 'info' })
+  });
+
+  return { toast: enhancedToast } as const;
+}
