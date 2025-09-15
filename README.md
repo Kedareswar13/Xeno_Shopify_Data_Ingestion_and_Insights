@@ -14,15 +14,17 @@ This README covers:
 
 ## 1) Project Overview
 
-- Backend (`backend/`): Node.js + Express, Prisma ORM (PostgreSQL), background sync from Shopify REST Admin API, multi‑tenant aware. Exposes REST endpoints for analytics, recent orders, top products, and sync controls.
-- Frontend (`frontend/`): Next.js 13 App Router, React 18, Tailwind + shadcn‑style UI components. Uses TanStack Query for data fetching and optimistic UI.
+- Backend (`backend/`): Node.js + Express, Prisma ORM (PostgreSQL), background sync from Shopify REST Admin API, multi‑tenant aware. Exposes REST endpoints for analytics, recent orders, top products, new/returning split, sales by product type/vendor, traffic heatmap, discounts, and sync controls.
+- Frontend (`frontend/`): Next.js 13 App Router, React 18, Tailwind + shadcn‑style UI components. Uses TanStack Query for on‑page queries; critical flows hard‑reload on certain actions to avoid stale UI after sync.
 - Database: PostgreSQL 15 (Docker compose provided). Prisma migrations and schema live in `backend/prisma/`.
 - Docker: `docker-compose.yml` provisions Postgres and PgAdmin for local dev.
 
 Key features implemented:
 - Dashboard with stats and Sales Overview chart
-- Recent Orders list, Top Products ranking, Top Customers insights
-- Store list with lazy-loaded tables and manual sync trigger
+- Recent Orders, Top Products, Top Customers (computed from orders)
+- AOV KPI, Discounts Impact, Sales by Product Type/Vendor, Customers: New vs Returning, Traffic Heatmap (Orders/Revenue)
+- Store list with connect + manual sync (triggers hard reload for freshness)
+- Auth with OTP email verification and multi‑tenant store access checks
 - AI features placeholders (predict performance, sentiment analysis) with API hooks ready
 
 ---
@@ -61,13 +63,13 @@ Database/Infra:
 ```
 frontend/ (Next.js)
   └─ src/
-     ├─ app/dashboard/page.tsx        # Dashboard: mounts SalesOverview, RecentOrders, TopProducts
-     ├─ components/dashboard/...      # Analytics components
+     ├─ app/dashboard/page.tsx        # Dashboard: mounts SalesOverview + new analytics widgets
+     ├─ components/dashboard/...      # Analytics components (SalesOverview, AOVKpi, DiscountsImpact, SalesByType, CustomerSplit, TrafficHeatmap, RecentOrders, TopProducts)
      └─ lib/shopify.ts                # REST client wrapper to backend
 
 backend/ (Express)
   ├─ src/services/shopify.service.ts  # Shopify REST client + sync services
-  ├─ src/controllers/                 # dashboard + sync controllers
+  ├─ src/controllers/                 # dashboard + sync controllers (sales, customers, products, heatmap, discounts)
   ├─ src/routes/shopify.routes.ts     # API routes (/api/shopify/...)
   ├─ prisma/schema.prisma             # DB models: Store, Order, Product, Customer, Event
   └─ utils/prisma.ts                  # Prisma client
@@ -78,7 +80,7 @@ Data flow (example for Sales Overview):
 2. Backend aggregates `orders` by `createdAt` day and returns daily sales and order counts.
 3. Frontend renders a continuous line chart with zero-filled days and dark styling.
 
-Order dates: The backend persists Shopify `created_at` (or `processed_at` fallback) into `orders.createdAt`, ensuring UI dates match Shopify.
+Order dates: The backend persists Shopify `created_at` (or `processed_at` fallback) into `orders.createdAt`, ensuring UI dates match Shopify. New/Returning logic is time‑range aware: first order in range is "New" if there are no pre‑range orders; subsequent orders in range are "Returning".
 
 ---
 
