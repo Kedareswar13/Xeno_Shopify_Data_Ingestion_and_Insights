@@ -50,7 +50,11 @@ class App {
     this.app.use(helmet());
 
     // Enable CORS (flexible for dev)
-    const configuredOrigins = (process.env.FRONTEND_URL || '')
+    // Support both FRONTEND_URL and FRONTEND_BASE_URL (comma-separated list allowed)
+    const rawOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_BASE_URL]
+      .filter(Boolean)
+      .join(',');
+    const configuredOrigins = rawOrigins
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
@@ -72,11 +76,23 @@ class App {
           if ((process.env.NODE_ENV || 'development') === 'development' && /^(http:\/\/)?(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
             return callback(null, true);
           }
-          return callback(new Error(`CORS blocked for origin: ${origin}`));
+          // Allow Vercel preview and production domains
+          try {
+            const url = new URL(origin);
+            const host = url.host;
+            if (host.endsWith('.vercel.app')) {
+              return callback(null, true);
+            }
+          } catch (_) {
+            // ignore parse errors
+          }
+          // In production, fail gracefully with 403 instead of throwing 500
+          return callback(null, false);
         },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
+        optionsSuccessStatus: StatusCodes.NO_CONTENT,
       })
     );
 
