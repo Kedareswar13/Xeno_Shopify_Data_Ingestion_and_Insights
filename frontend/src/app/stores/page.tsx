@@ -52,9 +52,6 @@ export default function StoresPage() {
 
     // Lazy-load tables for this store
     try {
-      // Fire-and-forget sync to keep data fresh (won't block UI)
-      api.post(`/api/shopify/stores/${store.id}/sync`).catch(() => {});
-
       const [recentOrders, topCustomers, topProducts] = await Promise.all([
         shopifyService.getRecentOrders(store.id, 15).catch(() => []),
         shopifyService.getCustomerInsights(store.id).catch(() => []),
@@ -117,16 +114,41 @@ export default function StoresPage() {
       <div className="space-y-3">
         {stores.map((store) => (
           <div key={store.id} className="rounded-xl border border-blue-800/50 bg-blue-900/40 shadow-sm">
-            <button
+            <div
+              role="button"
+              tabIndex={0}
               className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-blue-900/50 transition-colors rounded-t-xl"
               onClick={() => toggleExpand(store)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleExpand(store);
+                }
+              }}
             >
               <div>
                 <div className="font-medium text-white">{store.name || store.domain}</div>
                 <div className="text-xs text-blue-200">{store.domain}</div>
               </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="text-xs px-2 py-1 rounded border border-blue-700 text-blue-200 hover:bg-blue-900/40"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await api.post(`/api/shopify/stores/${store.id}/sync`);
+                      // Hard reload to reflect latest data immediately across views
+                      setTimeout(() => window.location.reload(), 100);
+                    } catch (err) {
+                      console.error('Manual sync failed', err);
+                    }
+                  }}
+                >
+                  Manual Sync
+                </button>
+              </div>
               <ChevronDown className={`h-4 w-4 transition-transform ${expanded[store.id] ? 'rotate-180' : ''}`} />
-            </button>
+            </div>
             {expanded[store.id] ? (
               <div className="px-4 pb-4 pt-1 space-y-6">
                 {/* Orders */}
