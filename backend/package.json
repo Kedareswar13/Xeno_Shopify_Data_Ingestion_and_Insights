@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "description": "Multi-tenant Shopify Data Ingestion & Insights Service",
   "_moduleAliases": {
-    "@": "./src"
+    "@": "./dist"
   },
   "main": "dist/app.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/app.ts",
-    "start": "node -r tsconfig-paths/register dist/app.js",
+    "start": "node -r module-alias/register dist/app.js",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint . --ext .ts",
     "prisma:generate": "prisma generate",
