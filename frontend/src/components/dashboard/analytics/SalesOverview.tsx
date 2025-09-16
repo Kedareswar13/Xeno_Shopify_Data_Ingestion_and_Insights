@@ -72,21 +72,7 @@ export function SalesOverview({ dateRange, storeId: passedStoreId }: SalesOvervi
         ? `${dateRange.from.toLocaleDateString()} - ${dateRange.to.toLocaleDateString()}`
         : `${dateRange.from.toLocaleDateString()}`)
     : '';
-  // Build reduced set of ticks to prevent congestion on long ranges
-  const buildTicks = (start: Date, end: Date, desired: number) => {
-    const total = Math.max(1, differenceInCalendarDays(end, start) + 1);
-    const step = Math.max(1, Math.floor(total / desired));
-    const ticks: string[] = [];
-    for (let i = 0; i < total; i += step) {
-      const d = addDays(start, i);
-      ticks.push(format(d, 'MMM d'));
-    }
-    // Ensure last tick is included
-    const lastLabel = format(end, 'MMM d');
-    if (ticks[ticks.length - 1] !== lastLabel) ticks.push(lastLabel);
-    return ticks;
-  };
-  const xTicks = buildTicks(rangeStart, rangeEnd, 7);
+  // Let Recharts auto-calculate ticks; we rotate labels to avoid overlap
 
   if (isLoading) {
     return (
@@ -125,7 +111,7 @@ export function SalesOverview({ dateRange, storeId: passedStoreId }: SalesOvervi
               top: 5,
               right: 30,
               left: 20,
-              bottom: 5,
+              bottom: 25,
             }}
           >
             <defs>
@@ -137,12 +123,13 @@ export function SalesOverview({ dateRange, storeId: passedStoreId }: SalesOvervi
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis 
               dataKey="date" 
-              tick={{ fill: '#9CA3AF' }}
+              tick={{ fill: '#9CA3AF', fontSize: 11 }}
               axisLine={{ stroke: '#4B5563' }}
               tickLine={{ stroke: '#4B5563' }}
-              ticks={xTicks}
-              interval={0}
-              minTickGap={12}
+              interval="preserveStartEnd"
+              minTickGap={20}
+              angle={-30}
+              textAnchor="end"
             />
             <YAxis 
               tick={{ fill: '#9CA3AF' }}
