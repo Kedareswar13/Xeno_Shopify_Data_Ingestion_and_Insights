@@ -120,20 +120,18 @@ const sendErrorProd = (err: any, req: Request, res: Response) => {
     });
   }
 
-  // B) RENDERED WEBSITE
-  // A) Operational, trusted error: send message to client
+  // B) NON-API ROUTES
+  // In this service we do not render server-side views. Always return JSON
   if (err.isOperational) {
-    return res.status(err.statusCode).render('error', {
-      title: 'Something went wrong!',
-      msg: err.message,
+    return res.status(err.statusCode).json({
+      status: err.status,
+      message: err.message,
     });
   }
-  // B) Programming or other unknown error: don't leak error details
-  // 1) Log error
+  // Programming or other unknown error: don't leak internals
   logger.error('ERROR 💥', err);
-  // 2) Send generic message
-  return res.status(err.statusCode).render('error', {
-    title: 'Something went wrong!',
-    msg: 'Please try again later.',
+  return res.status(err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json({
+    status: 'error',
+    message: 'Something went very wrong!',
   });
 };
