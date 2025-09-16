@@ -5,12 +5,10 @@ import { ThemeProvider } from '@/providers/ThemeProvider';
 import AuthProvider from '@/lib/auth';
 import { LayoutProvider } from '@/providers/LayoutProvider';
 import { Toaster } from '@/components/ui/toaster';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryProvider } from '@/providers/QueryProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// Create a client
-const queryClient = new QueryClient();
 
 export const metadata: Metadata = {
   title: 'Xeno Shopify Insights',
@@ -28,7 +26,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
       <body className={`${inter.className} min-h-screen bg-background text-foreground`}>
-        <QueryClientProvider client={queryClient}>
+        <QueryProvider>
           <ThemeProvider defaultTheme="system">
             <AuthProvider>
               <LayoutProvider>
@@ -37,7 +35,7 @@ export default function RootLayout({
               </LayoutProvider>
             </AuthProvider>
           </ThemeProvider>
-        </QueryClientProvider>
+        </QueryProvider>
       </body>
     </html>
   );
