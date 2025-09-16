@@ -8,6 +8,11 @@ import { Loader2 } from 'lucide-react';
 import { SalesOverview } from '@/components/dashboard/analytics/SalesOverview';
 import { RecentOrders } from '@/components/dashboard/analytics/RecentOrders';
 import { TopProducts } from '@/components/dashboard/analytics/TopProducts';
+import { AOVKpi } from '@/components/dashboard/analytics/AOVKpi';
+import { CustomerSplit } from '@/components/dashboard/analytics/CustomerSplit';
+import { SalesByType } from '@/components/dashboard/analytics/SalesByType';
+import { TrafficHeatmap } from '@/components/dashboard/analytics/TrafficHeatmap';
+import { DiscountsImpact } from '@/components/dashboard/analytics/DiscountsImpact';
 import { DateRange } from 'react-day-picker';
 import { addDays, subDays, format } from 'date-fns';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -30,6 +35,7 @@ export default function DashboardPage() {
   const [hasConnectedStore, setHasConnectedStore] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | undefined>(undefined);
   const [analytics, setAnalytics] = useState<{ total_revenue: number; total_orders: number; total_products: number; total_customers: number } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date(),
@@ -56,7 +62,7 @@ export default function DashboardPage() {
       if (hasStore) {
         const firstId = items[0].id;
         setSelectedStoreId(firstId);
-        await ensureSyncedThenFetchAnalytics(firstId);
+        await fetchAnalyticsOnly(firstId);
       }
     } catch (error) {
       console.error('Error fetching stores:', error);
@@ -66,33 +72,8 @@ export default function DashboardPage() {
     }
   };
 
-  const ensureSyncedThenFetchAnalytics = async (storeId: string) => {
+  const fetchAnalyticsOnly = async (storeId: string) => {
     try {
-      // Kick off background sync
-      api.post(`/api/shopify/stores/${storeId}/sync`).catch(() => {});
-
-      // Poll sync status briefly to let data catch up
-      const maxAttempts = 6; // ~6s total with 1s delay
-      let attempt = 0;
-      let isDataReady = false;
-
-      while (attempt < maxAttempts) {
-        try {
-          const status: any = await api.get(`/api/shopify/stores/${storeId}/sync-status`);
-          const stats = status?.data?.stats || status?.stats || status?.data || {};
-          const total = (stats.products || 0) + (stats.customers || 0) + (stats.orders || 0);
-          if (total > 0) {
-            isDataReady = true;
-            break;
-          }
-        } catch (e) {
-          // Ignore and keep trying
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-        attempt++;
-      }
-
-      // Fetch analytics regardless after attempts
       const ana = await shopifyService.getStoreAnalytics(storeId);
       setAnalytics(ana);
     } catch (err) {
@@ -110,8 +91,14 @@ export default function DashboardPage() {
     if (isAuthLoading) return;
 
     if (!user) {
-      console.log('No user found in dashboard, redirecting to login');
-      router.replace('/login');
+      const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('token');
+      if (!hasToken) {
+        console.log('No user and no token; redirecting to login');
+        router.replace('/login');
+      } else {
+        // Token exists; wait for AuthProvider to hydrate user
+        console.log('Token present but user not yet hydrated; waiting...');
+      }
       return;
     }
 
@@ -154,7 +141,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold text-white">No connected stores</h2>
           <p className="text-blue-200">Connect a Shopify store to see analytics on your dashboard.</p>
           <div className="flex items-center gap-3 justify-center">
-            <Button onClick={() => router.push('/stores')}>Connect a Store</Button>
+            <Button onClick={() => router.push('/stores/connect')}>Connect a Store</Button>
             <Button variant="outline" onClick={async () => { sessionStorage.removeItem(`dashboardFetched:${(user as any)?.id ?? 'anonymous'}`); await loadStores(); }}>Retry loading</Button>
           </div>
         </div>
@@ -228,7 +215,7 @@ export default function DashboardPage() {
               onChange={async (e) => {
                 const id = e.target.value;
                 setSelectedStoreId(id);
-                await ensureSyncedThenFetchAnalytics(id);
+                await fetchAnalyticsOnly(id);
               }}
             >
               {stores.map((s) => (
@@ -236,10 +223,22 @@ export default function DashboardPage() {
               ))}
             </select>
             <Button 
-              onClick={() => selectedStoreId && ensureSyncedThenFetchAnalytics(selectedStoreId)}
+              onClick={() => {
+                // Hard reload to guarantee all data and charts are in sync with latest backend state
+                setIsRefreshing(true);
+                // Small delay so spinner renders before reload
+                setTimeout(() => {
+                  window.location.reload();
+                }, 100);
+              }}
               className="w-full sm:w-auto"
+              disabled={isRefreshing}
             >
-              Refresh
+              {isRefreshing ? (
+                <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Refreshing</span>
+              ) : (
+                'Refresh'
+              )}
             </Button>
           </div>
         </div>
@@ -340,13 +339,26 @@ export default function DashboardPage() {
         {/* Left Column - Full Width on mobile, 2/3 on desktop */}
         <div className="lg:col-span-2 space-y-6">
           <SalesOverview dateRange={dateRange} storeId={selectedStoreId} />
+          {/* Row of compact KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <AOVKpi storeId={selectedStoreId} dateRange={dateRange} />
+            <DiscountsImpact storeId={selectedStoreId} dateRange={dateRange} />
+          </div>
+          {/* Sales by Type chart */}
+          <SalesByType storeId={selectedStoreId} dateRange={dateRange} />
         </div>
-        
+
         {/* Right Column */}
         <div className="space-y-6">
           <RecentOrders dateRange={dateRange} storeId={selectedStoreId} />
           <TopProducts dateRange={dateRange} storeId={selectedStoreId} />
+          <CustomerSplit storeId={selectedStoreId} dateRange={dateRange} />
         </div>
+      </div>
+
+      {/* Full-width Heatmap */}
+      <div className="grid grid-cols-1 gap-6">
+        <TrafficHeatmap storeId={selectedStoreId} dateRange={dateRange} />
       </div>
     </div>
   );
