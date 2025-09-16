@@ -54,6 +54,12 @@ export const errorHandler = (
       message: err.message,
       stack: err.stack,
     });
+    // Send the error response (single response path)
+    return res.status(err.statusCode).json({
+      status: err.status,
+      message: err.message,
+      stack: err.stack,
+    });
   } else if (process.env.NODE_ENV === 'production') {
     let error = { ...err };
     error.message = err.message;
@@ -64,15 +70,13 @@ export const errorHandler = (
     if (error.name === 'ValidationError') error = handleValidationErrorDB(error);
     if (error.name === 'JsonWebTokenError') error = handleJWTError();
     if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
-
-    sendErrorProd(error, req, res);
+    // Delegate to production sender (single response path)
+    return sendErrorProd(error, req, res);
   }
-
-  // Send the error response
-  res.status(err.statusCode).json({
+  // Fallback (unknown NODE_ENV)
+  return res.status(err.statusCode).json({
     status: err.status,
     message: err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 
