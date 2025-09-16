@@ -19,6 +19,7 @@
     "manual:sync": "ts-node -r tsconfig-paths/register scripts/manual-sync.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.1",
     "@shopify/shopify-api": "^11.14.1",
     "axios": "^1.12.1",
     "bcryptjs": "^2.4.3",
@@ -44,12 +45,10 @@
     "rate-limiter-flexible": "^7.3.0",
     "reflect-metadata": "^0.2.2",
     "typedi": "^0.10.0",
-    "typescript": "^5.2.2",
     "winston": "^3.17.0"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
-    "@prisma/client": "^6.16.1",
     "@types/axios": "^0.9.36",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.9",
@@ -79,7 +78,8 @@
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.2.2"
   },
   "engines": {
     "node": ">=18.0.0"
