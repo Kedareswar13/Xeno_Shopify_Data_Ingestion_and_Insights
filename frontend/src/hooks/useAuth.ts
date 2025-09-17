@@ -315,7 +315,7 @@ export function useAuth(): UseAuthReturn {
     }
   });
 
-  const registerMutation = useMutation<AuthResponse, Error, RegisterData>({
+  const registerMutation = useMutation<AuthResponse, any, RegisterData>({
     mutationFn: async (data) => {
       const response = await api.post<AuthResponse>('/api/auth/signup', {
         email: data.email,
@@ -344,18 +344,30 @@ export function useAuth(): UseAuthReturn {
         router.push('/login');
       }
     },
-    onError: (error: unknown) => {
+    onError: async (error: any, variables) => {
       console.error('Registration error:', error);
-      
-      // Show error message to user
-      const errorMessage = 
-        (error as any)?.response?.data?.message || 
-        (error as Error)?.message || 
-        'Registration failed';
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message;
+
+      // If email already exists, proactively send OTP and redirect to verification
+      if (status === 409 && variables?.email) {
+        try {
+          await api.post('/api/otp/send', { email: variables.email });
+          // Store email and go to verify-otp
+          localStorage.setItem('pendingVerificationEmail', variables.email);
+          router.push(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
+          toast.info('Account exists. We sent a verification code to your email.');
+          return;
+        } catch (e) {
+          console.error('Resend OTP after 409 failed:', e);
+        }
+      }
+
+      // Fallback error handling
+      const errorMessage = message || (error as Error)?.message || 'Registration failed';
       toast.error(errorMessage);
-      
-      // Clear any invalid auth state
-      if ((error as any)?.response?.status === 401) {
+
+      if (status === 401) {
         clearUser();
       }
     }
@@ -400,7 +412,8 @@ export function useAuth(): UseAuthReturn {
   // Resend OTP mutation
   const resendOtpMutation = useMutation<ApiResponse, Error, ResendOtpData>({
     mutationFn: async (data) => {
-      const response = await api.post<ApiResponse>('/api/auth/resend-otp', data);
+      // Backend exposes OTP send at /api/otp/send
+      const response = await api.post<ApiResponse>('/api/otp/send', data);
       return response;
     },
     onSuccess: (response) => {
