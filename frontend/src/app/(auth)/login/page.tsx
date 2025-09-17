@@ -53,7 +53,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
     
     try {
-      console.log('Attempting login with:', { email: data.email });
+      const emailTrimmed = data.email.trim().toLowerCase();
+      console.log('Attempting login with:', { email: emailTrimmed, hasPassword: !!data.password });
       
       // Reset the form immediately after submission starts
       const form = document.querySelector('form');
@@ -67,8 +68,8 @@ export default function LoginPage() {
         }
       }
       
-      // Call the login function and wait for it to complete
-      await login(data.email, data.password);
+      // Call the legacy login(email, password) function
+      await login(emailTrimmed, data.password);
       
       // Show success message
       toast.success('Login successful!');
