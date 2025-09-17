@@ -397,6 +397,11 @@ export const login = catchAsync(
     }
 
     // 5) Check if user is verified
+    logger.info('Login verification check', {
+      email: email.toLowerCase(),
+      userId: user.id,
+      isVerified: user.isVerified,
+    });
     // Allow a controlled bypass only for emails listed in ALLOW_UNVERIFIED_EMAILS (comma-separated)
     const allowList = (process.env.ALLOW_UNVERIFIED_EMAILS || '')
       .split(',')
