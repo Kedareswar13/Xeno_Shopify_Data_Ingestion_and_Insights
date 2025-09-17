@@ -397,7 +397,13 @@ export const login = catchAsync(
     }
 
     // 5) Check if user is verified
-    if (!user.isVerified) {
+    // Allow a controlled bypass only for emails listed in ALLOW_UNVERIFIED_EMAILS (comma-separated)
+    const allowList = (process.env.ALLOW_UNVERIFIED_EMAILS || '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const isBypassed = allowList.includes(email.toLowerCase());
+    if (!isBypassed && !user.isVerified) {
       // No longer tracking failed attempts
       /*
       await prisma.user.update({
